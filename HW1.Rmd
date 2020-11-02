@@ -1,0 +1,198 @@
+---
+title: "Homework Assignment 1"
+author: "Shreyas Parab"
+date: 'Assigned: Oct 24, 2020, Due Sun Nov 01, 2020 11:59PM'
+output:
+  html_document:
+    toc: yes
+    toc_float: yes
+    code_folding: hide
+  pdf_document:
+    toc: yes
+---
+```{r}
+library(dplyr)
+# Reading the nycflights file
+nyc <- read.csv("nycflights.csv")
+```
+
+```{r}
+# Cleaning data
+
+# Deleting the column X
+nyc$X <- NULL
+# Factorize necessary columns
+nyc$origin <- as.factor(nyc$origin)
+nyc$tailnum <- as.factor(nyc$tailnum)
+nyc$month <- as.factor(nyc$month)
+nyc$dest <- as.factor(nyc$dest)
+nyc$carrier <- as.factor(nyc$carrier)
+nyc$flight <- as.factor(nyc$flight)
+```
+
+
+
+
+### Data Exploration
+
+Let's first do some simple exploration of this data. 
+
+- How many airlines are there? (Hint: `levels` and `length` can be useful here)
+```{r}
+length(levels(nyc$carrier))
+```
+
+- How many flights there were by the airline with code `OO`? (Hint: `nrow` can be useful here along with logical indexing)
+```{r}
+AirDoubleZero <- nyc[nyc$carrier == "OO", ]
+nrow(AirDoubleZero)
+```
+
+
+- How long is the shortest flight out of any NYC airport? (Hint: `min` can be useful, remember to handle `NA` values)
+```{r}
+min(nyc$air_time, na.rm = TRUE)
+```
+
+
+- How many flights where there by United Airlines (code: UA) on Jan 12th 2013?
+```{r}
+UAJAN12 <- nyc[nyc$carrier == "UA" & nyc$year == 2013 & nyc$day == 12 & nyc$month == 1, ]
+nrow(UAJAN12)
+```
+
+
+### Arrival Delay
+
+Lets focus on Arrival Delay.
+
+- What was the average arrival delay for all airports and all airlines combined in Jan 2013? 
+```{r}
+nycjan <- nyc[nyc$month == 1, ]
+mean(nycjan$arr_delay, na.rm = T)
+```
+
+
+- Whats was the median arrival delay for all airports and all airlines combined in Jan 2013?
+```{r}
+median(nycjan$arr_delay, na.rm = T)
+```
+
+Based on your answers to the two questions above, what can you say about the distribution of arrival delays? Provide your answer in a text paragraph form.
+
+This is a right skewed data set because the mean is greater than the median. This means that majority of the flights will not be experiencing arrival delays.Actually majority of the flights will be reaching early.
+
+
+### Airline Performance
+
+Lets see if all airlines are equally terrible as far as flight arrival delays are concerned. For this question you will have to make sure that airline column is coded as a factor.
+
+- Calculate average arrival delays by airline (Hint: look up the command `tapply`)
+```{r}
+delay_by_airline <- tapply(nyc$arr_delay, nyc$carrier, mean, na.rm = TRUE)
+delay_by_airline
+```
+
+
+- Draw a Bar Plot of Average Arrival Delays for all the Airlines (Hint: command for making a Bar Plot is simply `barplot`)
+```{r}
+barplot(delay_by_airline,las=2)
+neg_delay_by_airline <- nyc[delay_by_airline < 0, ]
+```
+
+- Which airline has the highest average arrival delay? Which airline has the smallest average arrival delay? Are there airlines that actually have negative average delay? Provide answer to this question in a text paragraph form using **inline R code**.
+
+The airline with the highest arrival delay is: `r names(delay_by_airline[delay_by_airline == max(delay_by_airline)])` and the amount of delay is: `r round(max(delay_by_airline),2)` minutes.
+The airline with the lowest arrival delay is: `r names(delay_by_airline[delay_by_airline == min(delay_by_airline)])` and the amount of delay is: `r round(min(delay_by_airline),2)` minutes.
+The carriers that have negative average delay are `r names(delay_by_airline[delay_by_airline < 0])`
+
+### Air Gain
+
+Create a new column named airgain such that airgain = (departure delay - arrival delay) : this is the amount of delay a flight made up while in air.
+
+a) Explore airgain data - calculate suitable descriptive statistics and appropriate graphics to better understand this data. This part is open ended - you do what you feel works best for you.
+
+Answered with the help of the barplot
+b) Answer the questions:
+
+  - do airlines actually gain any time when in air on average?
+```{r}
+nyc$airgain <- (nyc$dep_delay - nyc$arr_delay)
+mean(nyc$airgain, na.rm = TRUE)
+```
+The positive value in air gain value tells us that on an average airlines do actually gain time when in air.
+
+  - Calculate average airgain for different airlines - which airlines do a better job, which do a worse job? 
+```{r}
+airgain_by_airline <- tapply(nyc$airgain, nyc$carrier, mean, na.rm = TRUE)
+airgain_by_airline
+```
+
+For the purpose of visualization and better understanding of which airline is performing a better job and which is doing worse we plot a barchart to depict the same.
+```{r}
+barplot(airgain_by_airline,las=2)
+```
+
+The airlines that actually lose time after taking off are 
+```{r}
+names(airgain_by_airline[airgain_by_airline < 0 ])
+```
+
+### Merging Data Frame
+
+The two data sets 'nycflights.csv' and 'planes.csv' were combined. This was done by with the help of the primary key (A common column that is present in both the data sets, which can be used to join the two datasets.)
+```{r}
+# Reading the planes file
+planes <- read.csv("planes.csv")
+
+# Removing the speed column as it does not contain any valuable information
+planes$speed <- NULL
+planes$X <- NULL
+
+# Merging the two data sets by using tailnum as the 'primary key'( Common column between the two datasets). 
+nycplanes <- merge(nyc,planes,by="tailnum")
+
+#data cleaning
+
+##there are two columns under the name 'year' in the joint data set. One of which is the year of purchase of the plane and the other is the year related to the date of the flight.
+
+names(nycplanes)[names(nycplanes) == "year.y"] <- "year_purchased"
+names(nycplanes)[names(nycplanes) == "year.x"] <- "year"
+
+```
+
+1) How many manufacturers do each of the airline company (carrier) buy their planes from?
+```{r}
+nycplanes %>% select(carrier,manufacturer) %>% group_by(carrier) %>% summarise(manu_count = n_distinct(manufacturer))
+```
+
+
+2) What is the average airtime of each carrier?
+```{r}
+nycplanes %>% select(carrier,air_time) %>% group_by(carrier) %>% summarise(avg_air_time = mean(air_time,na.rm = TRUE))
+```
+
+
+3) What is the peak month for each plane during which it is in the air for the maximum time?
+```{r}
+nycplanes %>% select(tailnum,month,air_time) %>% group_by(tailnum,month) %>% summarise(total_mon_airtime = sum(air_time, na.rm = TRUE)) %>% group_by(tailnum) %>% filter(total_mon_airtime == max(total_mon_airtime)) %>% head(5)
+
+```
+
+
+4) Number of origin airports that each carrier flies from?
+```{r}
+nycplanes %>% select(carrier,origin) %>% group_by(carrier) %>% summarise(origin_count = n_distinct(origin)) %>% head(10)
+```
+
+5) Number of models produced by each manufacturer?
+```{r}
+nycplanes %>% select(manufacturer,model) %>% group_by(manufacturer) %>% summarise(model_count = n_distinct(model)) %>% head(10)
+```
+
+
+
+
+
+
+
